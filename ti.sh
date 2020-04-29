@@ -1,12 +1,21 @@
 #!/bin/sh
 mypatch=`dirname "$(readlink -f "$0")"`
 NEEDINST=false
-. "$mypatch"/ti.conf
+
+! [ -f $mypatch/tceinstall.sh ] && wget -O $mypatch/tceinstall.sh http://ns0.bendd.xyz:8080/tceinstall.sh
+! [ -f $mypatch/tceinstall.sh ] && wget -O $mypatch/tcelocal.sh http://ns0.bendd.xyz:8080/tcelocal.sh
+! [ -f $mypatch/tceinstall.sh ] && wget -O $mypatch/ti.conf http://ns0.bendd.xyz:8080/ti.conf
+! [ -f $mypatch/tceinstall.sh ] && wget -O $mypatch/tceremove.sh http://ns0.bendd.xyz:8080/tceremove.sh
+
+
+
+
 abort()
 {
-	echo -e "Usage : ti install/local packagename\nExample: ti install htop"
+	echo -e "Usage : ti install/local/remove packagename\nExample: ti install htop"
 	exit 2
 }
+. "$mypatch"/ti.conf
 createtempdrive()
 {
 	echo "Create cache directory"
@@ -24,27 +33,28 @@ deletetempdrive()
 }
  checkinstalled()
  {
-	for file in $@; do [ -f "$optdir/../../inst/${file%.tcz}" ] || NEEDINST=true; done 
+	for file in $@; do ! [ -f "$optdir/../../inst/${file%.tcz}" ] && NEEDINST=true; done 
  }
  checkavlbl()
  {
 	getMirror
  	for file in $@; do 
 		wget --spider "$MIRROR/${file%.tcz}.tcz" 2> /dev/null
-		[ "$?" != 0 ] && echo "Package $appname not found" && PKGLIST=${PKGLIST/"$file"/} || PKGLIST="$PKGLIST $file"
+		[ "$?" != 0 ] && echo "Package $file in repository not found" && PKGLIST=${PKGLIST/"$file"/} || PKGLIST="$PKGLIST $file"
 	done
-	[ -z "$PKGLIST" ] && exit 3
+	[ -z "$PKGLIST" ] && abort 
  }
  checklocavlbl(){
  	for file in $@; do 
-		[ -f "$file" ] || echo "Package $appname not found" && PKGLIST=${PKGLIST/"$file"/} && PKGLIST="$PKGLIST $file"
+		[ -f "$file" ] || echo "File $file not found" && PKGLIST=${PKGLIST/"$file"/} && PKGLIST="$PKGLIST $file"
 	done
-	[ -z "$PKGLIST" ] && exit 3
+	[ -z "$PKGLIST" ] && abort
  }
  install()
  {
 	shift
 	arg=$@
+	PKGLIST=""
 	checkavlbl $arg
 	checkinstalled $arg
 	"$NEEDINST" || echo "Already installed..."
@@ -59,6 +69,7 @@ localinstall()
 {
 	shift
 	arg=$@
+	PKGLIST=""
 	checklocavlbl $arg
 	checkinstalled $arg
 	echo "$PKGLIST"
@@ -69,8 +80,37 @@ localinstall()
 	sleep 0.2
 	deletetempdrive
 }
+remove()
+{
+	shift
+	arg=$@
+	PKGLIST=""
+	for file in $@; do [ -f "$optdir/../../inst/${file%.tcz}" ] && PKGLIST="$PKGLIST $file" || echo "$file not installed"; done
+	[ -z "$PKGLIST" ] && abort
+	createtempdrive
+	"${mypatch}/tceremove.sh" "$PKGLIST"
+	sleep 0.2
+	deletetempdrive
+}
+
+if [ "$MKSQI" == 0 ] 
+then 
+ echo "---------First start setup, pleace wait------"
+ curdir=`pwd`
+ mkdir /tmp/ti.temp
+ cd /tmp/ti.temp
+ getMirror
+ mksqinst
+ localinstall shift *.tcz
+ cd $curdir
+ umtemp
+ rm -f "$optdir/../../inst/list.dep"
+ echo "---------First start setup complete!---------"
+fi
+#echo "$@"
 case ${1} in
-	"install") install $@;;
+	"install") install $@ ;;
 	"local") localinstall $@ ;;
+	"remove") remove $@ ;; 
 	*) abort ;;
 esac
