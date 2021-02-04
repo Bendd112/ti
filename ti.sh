@@ -5,7 +5,7 @@ optdir=$WORKDIR/optional
 TMPDIR=/tmp/tiinst
 KERNELVER=$(uname -r)
 MKSQI=$([ -f /usr/local/bin/mksquashfs ] && echo 1 || echo 0)
-LISTDEP="$optdir/../inst/list.dep"
+LISTDEP="$optdir/../inst/list.dp"
 _DOWNLIST=""
 _DOWNLINKS=""
 abort(){
