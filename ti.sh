@@ -51,9 +51,9 @@ mksqinst(){
 	done                                                 
 	
 }
-fuckRepack(){
+repack(){
 mkdir "all"
- cp -a /tmp/loop/* all/ > /dev/null 2> /dev/null
+ cp -a /tmp/tcloop/all/* all/ > /dev/null 2> /dev/null
 for file in *.tcz; do
 		EXECINST="$EXECINST $file"
 		dirname="${file%.tcz}"
@@ -70,6 +70,12 @@ for file in *.tcz; do
 	pack
 }
 pack (){
+echo "#!/bin/sh" > all/usr/local/tce.installed/all
+for file in all/usr/local/tce.installed/*
+do
+	! [ "$file" == "all/usr/local/tce.installed/all" ] && echo "${file/all}" >> all/usr/local/tce.installed/all
+done
+chmod +x all/usr/local/tce.installed/all
 echo "Packing..."
  mksquashfs all/ all.tcz -comp zstd -quiet -progress
  chmod 0777 all.tcz
@@ -153,7 +159,7 @@ chekintconn(){
 tceremove(){
 mkdir -p $TMPDIR/extension/all
 cd $TMPDIR/extension
-cp -a /tmp/loop/* all/ > /dev/null 2> /dev/null
+cp -a /tmp/tcloop/all/* all/ > /dev/null 2> /dev/null
 arh="${1%.tcz}.tcz$(checkdeps $1)"
 
 cd all
@@ -174,11 +180,11 @@ rm -rf $optdir/* 2> /dev/null
 cp "$TMPDIR/extension/all.tcz" "$optdir/."
 cd $TMPDIR
 echo "Mount..."
-[ -d /tmp/loop ] &&  umount /tmp/loop 2> /dev/null
-[ -d /tmp/loop ] ||  mkdir /tmp/loop
- mount $optdir/all.tcz /tmp/loop -t squashfs -o loop,ro
+[ -d /tmp/tcloop/all ] &&  umount /tmp/tcloop/all 2> /dev/null
+[ -d /tmp/tcloop/all ] ||  mkdir /tmp/tcloop/all
+ mount $optdir/all.tcz /tmp/tcloop/all -t squashfs -o loop,ro
 echo "Create symlinks..."
-yes y |  cp -ais /tmp/loop/* / 2>/dev/null
+yes y |  cp -ais /tmp/tcloop/all/* / 2>/dev/null
 
 }
 tcelocal(){
@@ -191,16 +197,16 @@ do
 	cp "${list%.tcz}.tcz" "$TMPDIR/extension"
 done
 cd "$TMPDIR/extension"
-fuckRepack
+repack
 rm -rf $optdir/* 2> /dev/null
  cp "$TMPDIR/extension/all.tcz" "$optdir/"
 cd $TMPDIR
 echo "Mount..."
-[ -d /tmp/loop ] &&  umount /tmp/loop 2> /dev/null
-[ -d /tmp/loop ] ||  mkdir /tmp/loop
- mount $optdir/all.tcz /tmp/loop -t squashfs -o loop,ro
+[ -d /tmp/tcloop/all ] &&  umount /tmp/tcloop/all 2> /dev/null
+[ -d /tmp/tcloop/all ] ||  mkdir /tmp/tcloop/all
+ mount $optdir/all.tcz /tmp/tcloop/all -t squashfs -o loop,ro
 echo "Create symlinks..."
-yes y |  cp -ais /tmp/loop/* / 2>/dev/null
+yes y |  cp -ais /tmp/tcloop/all/* / 2>/dev/null
 #echo "ldconfig..."
  ldconfig 2>/dev/null
 exscr $EXECINST
@@ -219,16 +225,16 @@ mkdir $TMPDIR/extension
 cd $TMPDIR/extension
 loadwd $args
 echo "Load complete with depencies"
-fuckRepack
+repack
 rm -rf $optdir/* 2> /dev/null
 cp "$TMPDIR/extension/all.tcz" "$optdir/"
 cd $TMPDIR
 echo "Mount..."
-[ -d /tmp/loop ] &&  umount /tmp/loop 2> /dev/null
-[ -d /tmp/loop ] ||  mkdir /tmp/loop
-mount $optdir/all.tcz /tmp/loop -t squashfs -o loop,ro
+[ -d /tmp/tcloop/all ] &&  umount /tmp/tcloop/all 2> /dev/null
+[ -d /tmp/tcloop/all ] ||  mkdir /tmp/tcloop/all
+mount $optdir/all.tcz /tmp/tcloop/all -t squashfs -o loop,ro
 echo "Create symlinks..."
-yes y |  cp -ais /tmp/loop/* / 2>/dev/null
+yes y |  cp -ais /tmp/tcloop/all/* / 2>/dev/null
 ldconfig 
 exscr $EXECINST
 echo "1" > /tmp/appserr
