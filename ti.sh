@@ -8,8 +8,9 @@ MKSQI=$([ -f /usr/local/bin/mksquashfs ] && echo 1 || echo 0)
 LISTDEP="$optdir/../inst/list.dp"
 _DOWNLIST=""
 _DOWNLINKS=""
+. /etc/init.d/busybox-aliases
 abort(){
-	echo -e "Usage : ti {install,local,remove,load [-d]} packagename\nExample: ti install htop"
+	echo -e "Usage : ti {install,local,remove,load [-d]} packagename\nti pae(WIP): Packing all packages\nExample: ti install htop"
 	exit 2
 }
 getMajorVer() {
@@ -36,35 +37,20 @@ getMirror() {
 	read MIRROR < /opt/tcemirror
 	MIRROR="${MIRROR%/}/$(getMajorVer).x/$BUILD/tcz"
 }
-mksqinst(){
-	               
-	mkdir $optdir/../inst                               
-	loadwd "squashfs-tools"                                 
-	mtab=""
-	for tcz in *.tcz                                    
-	do
-		[ -d /tmp/${tcz%.tcz} ] ||  mkdir /tmp/${tcz%.tcz}
-		mount $tcz /tmp/${tcz%.tcz} -t squashfs -o loop,ro
-		mtab="${mtab} /tmp/${tcz%.tcz}"
-		yes n |  cp -ais /tmp/"${tcz%.tcz}"/* / 2>/dev/null
-		ldconfig 2>/dev/null          
-	done                                                 
-	
-}
 repack(){
 mkdir "all"
+_args=$@
  cp -a /tmp/tcloop/all/* all/ > /dev/null 2> /dev/null
-for file in *.tcz; do
+for file in $_args; do
 		EXECINST="$EXECINST $file"
 		dirname="${file%.tcz}"
 		mkdir -p /tmp/tcztmp/$dirname
-		 mount $file /tmp/tcztmp/$dirname -t squashfs -o loop,ro
+		mount $file /tmp/tcztmp/$dirname -t squashfs -o loop,ro
 		cd /tmp/tcztmp/$dirname
-		 find -type f > "${optdir}/../inst/$dirname"
-		cd $TMPDIR/extension
-		 cp -a /tmp/tcztmp/$dirname/* all/ 
-		 umount /tmp/tcztmp/$dirname
-		rm $file
+		find -type f > "${optdir}/../inst/$dirname"
+		cd $TMPDIR
+		cp -a /tmp/tcztmp/$dirname/* all/ 
+		umount /tmp/tcztmp/$dirname
 	done
 	rm -rf /tmp/tcztmp
 	pack
@@ -73,11 +59,11 @@ pack (){
 echo "#!/bin/sh" > all/usr/local/tce.installed/all
 for file in all/usr/local/tce.installed/*
 do
-	! [ "$file" == "all/usr/local/tce.installed/all" ] && echo "${file/all}" >> all/usr/local/tce.installed/all
+	! [ "$file" == "all/usr/local/tce.installed/all" ] && echo "${file/all}" >> all/usr/local/tce.installed/all 
 done
 chmod +x all/usr/local/tce.installed/all
 echo "Packing..."
- mksquashfs all/ all.tcz -comp zstd -quiet -progress
+ mksquashfs all/ all.tcz -quiet -progress
  chmod 0777 all.tcz
 echo "done"
 }
@@ -112,12 +98,13 @@ rm -f *.dep
 loadwd(){
 for _list in $@ 
 do
-	appname="${_list%.tcz}.tcz"
-	loaddeps "$appname"
-	_DOWNLINKS="$_DOWNLINKS\n$MIRROR/$appname" 
-	_DOWNLIST="$_DOWNLIST $appname"
+	pkgname="${_list%.tcz}.tcz"
+	loaddeps "$pkgname"
+	_DOWNLINKS="$_DOWNLINKS\n$MIRROR/$pkgname" 
+	_DOWNLIST="$_DOWNLIST $pkgname"
 done
 	echo -e "$_DOWNLINKS" | awk '!($0 in a) {a[$0];print}' | xargs wget 
+	
 }
 load(){
 appname="${1%.tcz}.tcz"
@@ -157,8 +144,8 @@ chekintconn(){
     [ $? -ne 0 ] && echo "Check internet connection" && exit 5
 }
 tceremove(){
-mkdir -p $TMPDIR/extension/all
-cd $TMPDIR/extension
+mkdir -p $TMPDIR/all
+cd $TMPDIR
 cp -a /tmp/tcloop/all/* all/ > /dev/null 2> /dev/null
 arh="${1%.tcz}.tcz$(checkdeps $1)"
 
@@ -173,12 +160,11 @@ for list in $arh
 	sed -i "/$list/d" $LISTDEP
 	rm -f "$optdir/../inst/${list%.tcz}"
 done
-cd $TMPDIR/extension
+cd $TMPDIR
 find -L -type l | xargs rm -f
 pack
 rm -rf $optdir/* 2> /dev/null
-cp "$TMPDIR/extension/all.tcz" "$optdir/."
-cd $TMPDIR
+cp "$TMPDIR/all.tcz" "$optdir/."
 echo "Mount..."
 [ -d /tmp/tcloop/all ] &&  umount /tmp/tcloop/all 2> /dev/null
 [ -d /tmp/tcloop/all ] ||  mkdir /tmp/tcloop/all
@@ -190,17 +176,16 @@ yes y |  cp -ais /tmp/tcloop/all/* / 2>/dev/null
 tcelocal(){
 EXECINST=""
 echo "0" > /tmp/appserr
-mkdir "$TMPDIR/extension"
-for list in $@
-do
-	echo "copy $list"
-	cp "${list%.tcz}.tcz" "$TMPDIR/extension"
+pkglist=""
+_args=$@
+for pkg in $_args 
+do 
+	pkglist="$pkglist ${pkg%.tcz}.tcz"
 done
-cd "$TMPDIR/extension"
-repack
+cd "$TMPDIR"
+repack $pkglist
 rm -rf $optdir/* 2> /dev/null
- cp "$TMPDIR/extension/all.tcz" "$optdir/"
-cd $TMPDIR
+ cp "$TMPDIR/all.tcz" "$optdir/"
 echo "Mount..."
 [ -d /tmp/tcloop/all ] &&  umount /tmp/tcloop/all 2> /dev/null
 [ -d /tmp/tcloop/all ] ||  mkdir /tmp/tcloop/all
@@ -216,30 +201,13 @@ echo "Complete!"
 }
 tceinstall() {
 args=$@
-nargs=$#
-REPACK=false
-EXECINST=""
 getMirror
 echo "0" > /tmp/appserr
-mkdir $TMPDIR/extension
-cd $TMPDIR/extension
+cd $TMPDIR
 loadwd $args
 echo "Load complete with depencies"
-repack
-rm -rf $optdir/* 2> /dev/null
-cp "$TMPDIR/extension/all.tcz" "$optdir/"
-cd $TMPDIR
-echo "Mount..."
-[ -d /tmp/tcloop/all ] &&  umount /tmp/tcloop/all 2> /dev/null
-[ -d /tmp/tcloop/all ] ||  mkdir /tmp/tcloop/all
-mount $optdir/all.tcz /tmp/tcloop/all -t squashfs -o loop,ro
-echo "Create symlinks..."
-yes y |  cp -ais /tmp/tcloop/all/* / 2>/dev/null
-ldconfig 
-exscr $EXECINST
-echo "1" > /tmp/appserr
-echo "Complete!"  
-
+tcelocal $_DOWNLIST
+rm -f $_DOWNLIST
 }
 createtempdrive(){
 	mkdir $TMPDIR
@@ -271,14 +239,28 @@ if [ "$MKSQI" == 0 ]
 then 
 chekintconn
 echo "---------First start setup, pleace wait------"
-curdir=`pwd`
 createtempdrive
 cd $TMPDIR
 getMirror
-mksqinst
+mkdir $optdir/../inst                               
+loadwd "squashfs-tools"                                 
+mtab=""
+for tcz in *.tcz                                    
+	do
+	[ -d /tmp/${tcz%.tcz} ] ||  mkdir /tmp/${tcz%.tcz}
+	mount $tcz /tmp/${tcz%.tcz} -t squashfs -o loop,ro
+	mtab="${mtab} /tmp/${tcz%.tcz}"
+	yes n |  cp -ais /tmp/"${tcz%.tcz}"/* / 2>/dev/null
+	ldconfig 2>/dev/null          
+	done       
 tcelocal "*.tcz"
-cd $curdir
-rm -f "$optdir/../inst/list.dep"
+for umt in $mtab
+do 
+	umount $umt
+done
+cd - 2>/dev/null
+rm -f "$optdir/../inst/list.dp"
+
 deletetempdrive
 echo "---------First start setup complete!---------"
 fi
@@ -286,6 +268,7 @@ fi
 install(){
 	shift
 	checksqfst
+	chekintconn
 	arg=$@
 	PKGLIST=""
 	checkavlbl $arg
@@ -307,6 +290,7 @@ localinstall(){
 	"$NEEDINST" || echo "Already installed..."
 	"$NEEDINST" || exit 1
 	createtempdrive
+	cp $PKGLIST $TMPDIR
 	tcelocal "$PKGLIST" 
 	deletetempdrive
 }
@@ -336,11 +320,15 @@ loadfiles (){
 		load $FLIST
 	fi
 }
+packall(){
+	echo "(WIP!)"
+}
 checkroot
 case ${1} in
 	"install") install $@ ;;
 	"local") localinstall $@ ;;
 	"remove") remove $@ ;; 
 	"load") loadfiles $@ ;;
+	"pae") packall $@ ;;
 	*) abort ;;
 esac
