@@ -323,6 +323,10 @@ loadfiles (){
 packall(){
 	echo "(WIP!)"
 }
+upgrade(){
+	echo "(WIP!)"
+}
+
 checkroot
 case ${1} in
 	"install") install $@ ;;
@@ -330,5 +334,6 @@ case ${1} in
 	"remove") remove $@ ;; 
 	"load") loadfiles $@ ;;
 	"pae") packall $@ ;;
+	"upgrade") upgrade $@ ;;
 	*) abort ;;
 esac
