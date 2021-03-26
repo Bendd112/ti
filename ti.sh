@@ -17,10 +17,10 @@ getMajorVer() {
 	awk '{printf "%d", $1}' /usr/share/doc/tc/release.txt 
 }
 checkroot() {
- if [ `/usr/bin/id -u` -ne 0 ]; then
-   echo "Need root privileges." >&2
-   exit 1
- fi
+	if [ `/usr/bin/id -u` -ne 0 ]; then
+		echo "Need root privileges." >&2
+		exit 1
+	fi
 }
 getBuild() {
 	BUILD=`uname -m`
@@ -38,10 +38,10 @@ getMirror() {
 	MIRROR="${MIRROR%/}/$(getMajorVer).x/$BUILD/tcz"
 }
 repack(){
-mkdir "all"
-_args=$@
- cp -a /tmp/tcloop/all/* all/ > /dev/null 2> /dev/null
-for file in $_args; do
+	mkdir "all"
+	_args=$@
+	cp -a /tmp/tcloop/all/* all/ > /dev/null 2> /dev/null
+	for file in $_args; do
 		EXECINST="$EXECINST $file"
 		dirname="${file%.tcz}"
 		mkdir -p /tmp/tcztmp/$dirname
