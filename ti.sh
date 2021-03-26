@@ -56,16 +56,16 @@ for file in $_args; do
 	pack
 }
 pack (){
-echo "#!/bin/sh" > all/usr/local/tce.installed/all
-for file in all/usr/local/tce.installed/*
-do
-	! [ "$file" == "all/usr/local/tce.installed/all" ] && echo "${file/all}" >> all/usr/local/tce.installed/all 
-done
-chmod +x all/usr/local/tce.installed/all
-echo "Packing..."
- mksquashfs all/ all.tcz -quiet -progress
- chmod 0777 all.tcz
-echo "done"
+	echo "#!/bin/sh" > all/usr/local/tce.installed/all
+	for file in all/usr/local/tce.installed/*
+	do
+		! [ "$file" == "all/usr/local/tce.installed/all" ] && echo "${file/all}" >> all/usr/local/tce.installed/all 
+	done
+	chmod +x all/usr/local/tce.installed/all
+	echo "Packing..."
+	mksquashfs all/ all.tcz -quiet -progress
+	chmod 0777 all.tcz
+	echo "done"
 }
 exscr () {
 	for list in $@
@@ -74,140 +74,135 @@ exscr () {
 	done
 }
 loaddeps (){
-getrecDep "$1"
-[ -n "$(ls -A | grep .dep)" ] || return 0
-for file in *.dep 
-do
-[ "squashfs-tools.tcz.dep" == "$file" ] && [ "$MKSQI" == 1 ] && continue
-echo -n "${file%.dep}:" >> "$LISTDEP"
- while IFS= read -r line; do
-	down="${line//-KERNEL.tcz/-${KERNELVER}.tcz}"
-	echo -n "$down " >> "$LISTDEP"
-	if [ -f "$optdir/../inst/${down%.tcz}" ] ;
-	then 
-		echo "Already installed: $down"
-	else
-		_DOWNLIST="$_DOWNLIST $down"
-		_DOWNLINKS="$_DOWNLINKS\n$MIRROR/$down" 
-	fi
- done < "$file"
- echo -ne "\n" >> "$LISTDEP"
-done
-rm -f *.dep
+	getrecDep "$1"
+	[ -n "$(ls -A | grep .dep)" ] || return 0
+	for file in *.dep
+	do
+		[ "squashfs-tools.tcz.dep" == "$file" ] && [ "$MKSQI" == 1 ] && continue
+		echo -n "${file%.dep}:" >> "$LISTDEP"
+		while IFS= read -r line; do
+			down="${line//-KERNEL.tcz/-${KERNELVER}.tcz}"
+			echo -n "$down " >> "$LISTDEP"
+			if [ -f "$optdir/../inst/${down%.tcz}" ] ;
+			then 
+				echo "Already installed: $down"
+			else
+				_DOWNLIST="$_DOWNLIST $down"
+				_DOWNLINKS="$_DOWNLINKS\n$MIRROR/$down"
+			fi
+		 done < "$file"
+		 echo -ne "\n" >> "$LISTDEP"
+	done
+	rm -f *.dep
 }
 loadwd(){
-for _list in $@ 
-do
-	pkgname="${_list%.tcz}.tcz"
-	loaddeps "$pkgname"
-	_DOWNLINKS="$_DOWNLINKS\n$MIRROR/$pkgname" 
-	_DOWNLIST="$_DOWNLIST $pkgname"
-done
-	echo -e "$_DOWNLINKS" | awk '!($0 in a) {a[$0];print}' | xargs wget 
-	
+	for _list in $@
+	do
+		pkgname="${_list%.tcz}.tcz"
+		loaddeps "$pkgname"
+		_DOWNLINKS="$_DOWNLINKS\n$MIRROR/$pkgname"
+		_DOWNLIST="$_DOWNLIST $pkgname"
+	done
+	echo -e "$_DOWNLINKS" | awk '!($0 in a) {a[$0];print}' | xargs wget
 }
 load(){
-appname="${1%.tcz}.tcz"
-wget "$MIRROR/$appname"	
+	appname="${1%.tcz}.tcz"
+	wget "$MIRROR/$appname"
 }
 getrecDep() {
-dep="$1"
-dep="${dep}.dep"
-dep="${dep//-KERNEL.tcz/-${KERNELVER}.tcz}"
-echo -ne "Get dependences:${dep%.}\033[0K\r"
-wget "$MIRROR/$dep" 2> /dev/null
-if [ -f "$dep" ] 
-then
-while IFS= read -r line; do	
-	getrecDep "$line"
-done < "$dep"
-fi
+	dep="$1"
+	dep="${dep}.dep"
+	dep="${dep//-KERNEL.tcz/-${KERNELVER}.tcz}"
+	echo -ne "Get dependences:${dep%.}\033[0K\r"
+	wget "$MIRROR/$dep" 2> /dev/null
+	if [ -f "$dep" ]
+	then
+		while IFS= read -r line; do
+			getrecDep "$line"
+		done < "$dep"
+	fi
 }
 readdep(){
-deps=""
-while read line; do 
-	[ "${line%%:*}" == "${1%.tcz}.tcz" ] && deps="${line#${1%.tcz}.tcz:}"
-done < "$LISTDEP"
-echo "$deps" 
-! [ -z "$deps" ] && for list in $deps; do echo $(readdep $list);done
-
+	deps=""
+	while read line; do
+		[ "${line%%:*}" == "${1%.tcz}.tcz" ] && deps="${line#${1%.tcz}.tcz:}"
+	done < "$LISTDEP"
+	echo "$deps"
+	! [ -z "$deps" ] && for list in $deps; do echo $(readdep $list);done
 }
 checkdeps(){
-dep=$(readdep $1)
-for list in $dep
-do
-	! [ $(expr $(grep "$list" "$LISTDEP" | wc -l) - $(grep "$list:" "$LISTDEP" | wc -l)) -ge "2" ] && echo -n " $list"
-done
+	dep=$(readdep $1)
+	for list in $dep
+	do
+		! [ $(expr $(grep "$list" "$LISTDEP" | wc -l) - $(grep "$list:" "$LISTDEP" | wc -l)) -ge "2" ] && echo -n " $list"
+	done
 }
 chekintconn(){
 	ping 8.8.8.8 -c 1 -W 1 > /dev/null
-    [ $? -ne 0 ] && echo "Check internet connection" && exit 5
+	[ $? -ne 0 ] && echo "Check internet connection" && exit 5
 }
 tceremove(){
-mkdir -p $TMPDIR/all
-cd $TMPDIR
-cp -a /tmp/tcloop/all/* all/ > /dev/null 2> /dev/null
-arh="${1%.tcz}.tcz$(checkdeps $1)"
-
-cd all
-for list in $arh
+	mkdir -p $TMPDIR/all
+	cd $TMPDIR
+	cp -a /tmp/tcloop/all/* all/ > /dev/null 2> /dev/null
+	arh="${1%.tcz}.tcz$(checkdeps $1)"
+	cd all
+	for list in $arh
 	do
-	echo "Remove : ${list%.tcz}"
-	while read file
-	do
-		rm -f $file
-	done < "$optdir/../inst/${list%.tcz}"
-	sed -i "/$list/d" $LISTDEP
-	rm -f "$optdir/../inst/${list%.tcz}"
-done
-cd $TMPDIR
-find -L -type l | xargs rm -f
-pack
-rm -rf $optdir/* 2> /dev/null
-cp "$TMPDIR/all.tcz" "$optdir/."
-echo "Mount..."
-[ -d /tmp/tcloop/all ] &&  umount /tmp/tcloop/all 2> /dev/null
-[ -d /tmp/tcloop/all ] ||  mkdir /tmp/tcloop/all
- mount $optdir/all.tcz /tmp/tcloop/all -t squashfs -o loop,ro
-echo "Create symlinks..."
-yes y |  cp -ais /tmp/tcloop/all/* / 2>/dev/null
-
+		echo "Remove : ${list%.tcz}"
+		while read file
+		do
+			rm -f $file
+		done < "$optdir/../inst/${list%.tcz}"
+		sed -i "/$list/d" $LISTDEP
+		rm -f "$optdir/../inst/${list%.tcz}"
+	done
+	cd $TMPDIR
+	find -L -type l | xargs rm -f
+	pack
+	rm -rf $optdir/* 2> /dev/null
+	cp "$TMPDIR/all.tcz" "$optdir/."
+	echo "Mount..."
+	[ -d /tmp/tcloop/all ] &&  umount /tmp/tcloop/all 2> /dev/null
+	[ -d /tmp/tcloop/all ] ||  mkdir /tmp/tcloop/all
+	mount $optdir/all.tcz /tmp/tcloop/all -t squashfs -o loop,ro
+	echo "Create symlinks..."
+	yes y |  cp -ais /tmp/tcloop/all/* / 2>/dev/null
 }
 tcelocal(){
-EXECINST=""
-echo "0" > /tmp/appserr
-pkglist=""
-_args=$@
-for pkg in $_args 
-do 
-	pkglist="$pkglist ${pkg%.tcz}.tcz"
-done
-cd "$TMPDIR"
-repack $pkglist
-rm -rf $optdir/* 2> /dev/null
- cp "$TMPDIR/all.tcz" "$optdir/"
-echo "Mount..."
-[ -d /tmp/tcloop/all ] &&  umount /tmp/tcloop/all 2> /dev/null
-[ -d /tmp/tcloop/all ] ||  mkdir /tmp/tcloop/all
- mount $optdir/all.tcz /tmp/tcloop/all -t squashfs -o loop,ro
-echo "Create symlinks..."
-yes y |  cp -ais /tmp/tcloop/all/* / 2>/dev/null
-#echo "ldconfig..."
- ldconfig 2>/dev/null
-exscr $EXECINST
-echo "1" > /tmp/appserr
-echo "Complete!"  
-
+	EXECINST=""
+	echo "0" > /tmp/appserr
+	pkglist=""
+	_args=$@
+	for pkg in $_args
+	do
+		pkglist="$pkglist ${pkg%.tcz}.tcz"
+	done
+	cd "$TMPDIR"
+	repack $pkglist
+	rm -rf $optdir/* 2> /dev/null
+	cp "$TMPDIR/all.tcz" "$optdir/"
+	echo "Mount..."
+	[ -d /tmp/tcloop/all ] &&  umount /tmp/tcloop/all 2> /dev/null
+	[ -d /tmp/tcloop/all ] ||  mkdir /tmp/tcloop/all
+	mount $optdir/all.tcz /tmp/tcloop/all -t squashfs -o loop,ro
+	echo "Create symlinks..."
+	yes y |  cp -ais /tmp/tcloop/all/* / 2>/dev/null
+	#echo "ldconfig..."
+	ldconfig 2>/dev/null
+	exscr $EXECINST
+	echo "1" > /tmp/appserr
+	echo "Complete!"
 }
 tceinstall() {
-args=$@
-getMirror
-echo "0" > /tmp/appserr
-cd $TMPDIR
-loadwd $args
-echo "Load complete with depencies"
-tcelocal $_DOWNLIST
-rm -f $_DOWNLIST
+	args=$@
+	getMirror
+	echo "0" > /tmp/appserr
+	cd $TMPDIR
+	loadwd $args
+	echo "Load complete with depencies"
+	tcelocal $_DOWNLIST
+	rm -f $_DOWNLIST
 }
 createtempdrive(){
 	mkdir $TMPDIR
@@ -235,35 +230,34 @@ checklocavlbl(){
 	[ -z "$PKGLIST" ] && abort
  }
 checksqfst(){
-if [ "$MKSQI" == 0 ] 
-then 
-chekintconn
-echo "---------First start setup, pleace wait------"
-createtempdrive
-cd $TMPDIR
-getMirror
-mkdir $optdir/../inst                               
-loadwd "squashfs-tools"                                 
-mtab=""
-for tcz in *.tcz                                    
-	do
-	[ -d /tmp/${tcz%.tcz} ] ||  mkdir /tmp/${tcz%.tcz}
-	mount $tcz /tmp/${tcz%.tcz} -t squashfs -o loop,ro
-	mtab="${mtab} /tmp/${tcz%.tcz}"
-	yes n |  cp -ais /tmp/"${tcz%.tcz}"/* / 2>/dev/null
-	ldconfig 2>/dev/null          
-	done       
-tcelocal "*.tcz"
-for umt in $mtab
-do 
-	umount $umt
-done
-cd - 2>/dev/null
-rm -f "$optdir/../inst/list.dp"
-
-deletetempdrive
-echo "---------First start setup complete!---------"
-fi
+	if [ "$MKSQI" == 0 ] 
+	then 
+		chekintconn
+		echo "---------First start setup, pleace wait------"
+		createtempdrive
+		cd $TMPDIR
+		getMirror
+		mkdir $optdir/../inst
+		loadwd "squashfs-tools"
+		mtab=""
+		for tcz in *.tcz
+		do
+			[ -d /tmp/${tcz%.tcz} ] ||  mkdir /tmp/${tcz%.tcz}
+			mount $tcz /tmp/${tcz%.tcz} -t squashfs -o loop,ro
+			mtab="${mtab} /tmp/${tcz%.tcz}"
+			yes n |  cp -ais /tmp/"${tcz%.tcz}"/* / 2>/dev/null
+			ldconfig 2>/dev/null
+		done
+		tcelocal "*.tcz"
+		for umt in $mtab
+		do 
+			umount $umt
+		done
+		cd - 2>/dev/null
+		rm -f "$optdir/../inst/list.dp"
+		deletetempdrive
+		echo "---------First start setup complete!---------"
+	fi
 }
 install(){
 	shift
@@ -322,6 +316,7 @@ loadfiles (){
 }
 packall(){
 	echo "(WIP!)"
+	
 }
 upgrade(){
 	echo "(WIP!)"
