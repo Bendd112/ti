@@ -70,7 +70,7 @@ pack (){
 exscr () {
 	for list in $@
 	do
-		 [ -f /usr/local/tce.installed/${list%.tcz} ] && /usr/local/tce.installed/${list%.tcz}
+		[ -f /usr/local/tce.installed/${list%.tcz} ] && /usr/local/tce.installed/${list%.tcz}
 	done
 }
 loaddeps (){
@@ -191,6 +191,8 @@ tcelocal(){
 	#echo "ldconfig..."
 	ldconfig 2>/dev/null
 	exscr $EXECINST
+	echo "Depmod..."
+	depmod
 	echo "1" > /tmp/appserr
 	echo "Complete!"
 }
