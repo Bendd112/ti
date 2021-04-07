@@ -2,16 +2,22 @@
 NEEDINST=false
 WORKDIR=$(readlink /etc/sysconfig/tcedir)
 optdir=$WORKDIR/optional
-TMPDIR=/tmp/tiinst
+TMPDIR=$WORKDIR/TMP
 KERNELVER=$(uname -r)
 MKSQI=$([ -f /usr/local/bin/mksquashfs ] && echo 1 || echo 0)
 LISTDEP="$optdir/../inst/list.dp"
 _DOWNLIST=""
-_DOWNLINKS=""
+#_DOWNLINKS=""
 . /etc/init.d/busybox-aliases
 abort(){
 	echo -e "Usage : ti {install,local,remove,load [-d]} packagename\nti pae(WIP): Packing all packages\nExample: ti install htop"
 	exit 2
+}
+eabort(){
+	errnum=$1
+	echo "Exit with error:$errnum"
+	echo "$2"
+	exit $errnum
 }
 getMajorVer() {
 	awk '{printf "%d", $1}' /usr/share/doc/tc/release.txt 
@@ -35,6 +41,7 @@ getBuild() {
 getMirror() {
 	BUILD=$(getBuild)
 	read MIRROR < /opt/tcemirror
+	[ "$MIRROR" ] || eabort 9 "Mirror not found"
 	MIRROR="${MIRROR%/}/$(getMajorVer).x/$BUILD/tcz"
 }
 repack(){
@@ -63,7 +70,7 @@ pack (){
 	done
 	chmod +x all/usr/local/tce.installed/all
 	echo "Packing..."
-	mksquashfs all/ all.tcz -quiet -progress
+	mksquashfs all/ all.tcz -quiet -progress || eabort 10 "Error in mksquashfs process"
 	chmod 0777 all.tcz
 	echo "done"
 }
@@ -88,7 +95,7 @@ loaddeps (){
 				echo "Already installed: $down"
 			else
 				_DOWNLIST="$_DOWNLIST $down"
-				_DOWNLINKS="$_DOWNLINKS\n$MIRROR/$down"
+				#_DOWNLINKS="$_DOWNLINKS\n$MIRROR/$down"
 			fi
 		 done < "$file"
 		 echo -ne "\n" >> "$LISTDEP"
@@ -100,10 +107,15 @@ loadwd(){
 	do
 		pkgname="${_list%.tcz}.tcz"
 		loaddeps "$pkgname"
-		_DOWNLINKS="$_DOWNLINKS\n$MIRROR/$pkgname"
+		#_DOWNLINKS="$_DOWNLINKS\n$MIRROR/$pkgname"
 		_DOWNLIST="$_DOWNLIST $pkgname"
+	
 	done
-	echo -e "$_DOWNLINKS" | awk '!($0 in a) {a[$0];print}' | xargs wget
+	for _wget in $_DOWNLIST
+	do
+		[ -f $_wget ] || wget $MIRROR/$_wget
+	done
+	#echo -e "$_DOWNLINKS" | awk '!($0 in a) {a[$0];print}' | xargs wget
 }
 load(){
 	appname="${1%.tcz}.tcz"
@@ -114,7 +126,7 @@ getrecDep() {
 	dep="${dep}.dep"
 	dep="${dep//-KERNEL.tcz/-${KERNELVER}.tcz}"
 	echo -ne "Get dependences:${dep%.}\033[0K\r"
-	wget "$MIRROR/$dep" 2> /dev/null
+	[ -f $dep ] || wget "$MIRROR/$dep" 2> /dev/null
 	if [ -f "$dep" ]
 	then
 		while IFS= read -r line; do
@@ -138,13 +150,14 @@ checkdeps(){
 	done
 }
 chekintconn(){
-	ping 8.8.8.8 -c 1 -W 1 > /dev/null
-	[ $? -ne 0 ] && echo "Check internet connection" && exit 5
+	ping 8.8.8.8 -c 1 -W 1 > /dev/null || eabort 5 "Check internet connection"
 }
 tceremove(){
 	mkdir -p $TMPDIR/all
 	cd $TMPDIR
+	echo -ne "Copy old..."
 	cp -a /tmp/tcloop/all/* all/ > /dev/null 2> /dev/null
+	echo "Done"
 	arh="${1%.tcz}.tcz$(checkdeps $1)"
 	cd all
 	for list in $arh
@@ -199,18 +212,17 @@ tcelocal(){
 tceinstall() {
 	args=$@
 	getMirror
-	echo "0" > /tmp/appserr
 	cd $TMPDIR
 	loadwd $args
 	echo "Load complete with depencies"
 	tcelocal $_DOWNLIST
 	rm -f $_DOWNLIST
 }
-createtempdrive(){
+mktmp(){
 	mkdir $TMPDIR
 	chmod 0777 -R $TMPDIR
 }
-deletetempdrive(){
+rmtmp(){
 	rm -rf $TMPDIR
 }
 checkinstalled(){
@@ -223,20 +235,20 @@ checkavlbl(){
 		wget --spider "$MIRROR/${file%.tcz}.tcz" 2> /dev/null
 		[ "$?" != 0 ] && echo "Package $file in repository not found" && PKGLIST=${PKGLIST/"$file"/} || PKGLIST="$PKGLIST $file"
 	done
-	[ -z "$PKGLIST" ] && abort 
+	[ -z "$PKGLIST" ] && eabort 2 "Package(s) not found!"
  }
 checklocavlbl(){
  	for file in $@; do 
 		[ -f "$file" ] || echo "File $file not found" && PKGLIST=${PKGLIST/"$file"/} && PKGLIST="$PKGLIST $file"
 	done
-	[ -z "$PKGLIST" ] && abort
+	[ -z "$PKGLIST" ] && eabort 3 "Package(s) not found!"
  }
 checksqfst(){
 	if [ "$MKSQI" == 0 ] 
 	then 
 		chekintconn
-		echo "---------First start setup, pleace wait------"
-		createtempdrive
+		echo "---------First start setup, please wait------"
+		mktmp
 		cd $TMPDIR
 		getMirror
 		mkdir $optdir/../inst
@@ -257,23 +269,23 @@ checksqfst(){
 		done
 		cd - 2>/dev/null
 		rm -f "$optdir/../inst/list.dp"
-		deletetempdrive
+		rmtmp
+		echo "all.tcz" > $WORKDIR/onboot.lst
 		echo "---------First start setup complete!---------"
 	fi
 }
 install(){
 	shift
 	checksqfst
-	chekintconn
 	arg=$@
 	PKGLIST=""
 	checkavlbl $arg
 	checkinstalled $arg
 	"$NEEDINST" || echo "Already installed..."
 	"$NEEDINST" || exit 1
-	createtempdrive
+	mktmp
 	tceinstall "$PKGLIST" 
-	deletetempdrive
+	rmtmp
 }
 localinstall(){
 	shift
@@ -285,10 +297,13 @@ localinstall(){
 	echo "$PKGLIST"
 	"$NEEDINST" || echo "Already installed..."
 	"$NEEDINST" || exit 1
-	createtempdrive
-	cp $PKGLIST $TMPDIR
-	tcelocal "$PKGLIST" 
-	deletetempdrive
+	mktmp
+	for _pkga in $PKGLIST 
+	do
+	       	cp $_pkga* $TMPDIR
+	done
+	tceinstall "$PKGLIST" 
+	rmtmp
 }
 remove(){
 	shift
@@ -297,9 +312,9 @@ remove(){
 	PKGLIST=""
 	for file in $@; do [ -f "$optdir/../inst/${file%.tcz}" ] && PKGLIST="$PKGLIST $file" || echo "$file not installed"; done
 	[ -z "$PKGLIST" ] && abort
-	createtempdrive
+	mktmp
 	tceremove "$PKGLIST"
-	deletetempdrive
+	rmtmp
 }
 loadfiles (){
 	shift
@@ -318,6 +333,7 @@ loadfiles (){
 }
 packall(){
 	echo "(WIP!)"
+	
 	
 }
 upgrade(){
