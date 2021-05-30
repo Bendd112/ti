@@ -20,7 +20,14 @@ eabort(){
 	exit $errnum
 }
 getMajorVer() {
-	awk '{printf "%d", $1}' /usr/share/doc/tc/release.txt 
+	if [ -f /usr/share/doc/tc/release.txt ] ; then
+		awk '{printf "%d", $1}' /usr/share/doc/tc/release.txt 
+		return 0
+	else 
+		verid=$(grep '^VERSION_ID=' /etc/os-release)
+		fullver=${verid#*=}
+		echo ${fullver%.*}
+	fi
 }
 checkroot() {
 	if [ `/usr/bin/id -u` -ne 0 ]; then
