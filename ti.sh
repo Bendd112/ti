@@ -92,10 +92,10 @@ loaddeps (){
 	[ -n "$(ls -A | grep .dep)" ] || return 0
 	for file in *.dep
 	do
-		[ "squashfs-tools.tcz.dep" == "$file" ] && [ "$MKSQI" == 1 ] && continue
 		echo -n "${file%.dep}:" >> "$LISTDEP"
 		while IFS= read -r line; do
 			down="${line//-KERNEL.tcz/-${KERNELVER}.tcz}"
+			[ "${line%.tcz}" == "squashfs-tools" ] && continue
 			echo -n "$down " >> "$LISTDEP"
 			if [ -f "$optdir/../inst/${down%.tcz}" ] ;
 			then 
@@ -169,6 +169,7 @@ tceremove(){
 	cd all
 	for list in $arh
 	do
+		[ "${list%.tcz}" == "squashfs-tools" ] && continue
 		echo "Remove : ${list%.tcz}"
 		while read file
 		do
